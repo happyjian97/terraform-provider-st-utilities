@@ -1,6 +1,6 @@
 data "st-utilities_chacha20_encrypt" "encrypt" {
-  string_value = jsonencode({ foo = "bar" })
   encrypt_key  = "my-secret-passphrase"
+  string_value = jsonencode({ foo = "bar" })
 }
 
 output "encrypted" {
