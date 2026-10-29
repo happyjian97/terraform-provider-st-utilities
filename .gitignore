@@ -11,8 +11,20 @@
 # Test binary, built with `go test -c`
 *.test
 
-# ignore .terraform in examples.
-.terraform/
-
-# Visual Studio Code launch config.
+#######################
+# VsCode launch config.
+#######################
 .vscode
+
+############
+# Terraform
+############
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
