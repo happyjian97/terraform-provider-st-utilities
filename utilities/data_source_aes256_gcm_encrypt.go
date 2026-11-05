@@ -156,7 +156,7 @@ func encryptAES256GCM(key, input, aad string) (string, error) {
 	output := aes256GCMEncryptOutput{
 		Nonce:      hex.EncodeToString(nonce),
 		Ciphertext: base64.StdEncoding.EncodeToString(sealed),
-		Tag:        base64.StdEncoding.EncodeToString([]byte(aad)),
+		Tag:        string(aad),
 	}
 
 	outputJSON, err := json.Marshal(output)
