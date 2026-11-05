@@ -2,8 +2,10 @@ package utilities
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -27,9 +29,10 @@ func NewChacha20EncryptDataSource() datasource.DataSource {
 type chacha20EncryptDataSource struct{}
 
 type chacha20EncryptDataSourceModel struct {
-	EncryptKey           types.String `tfsdk:"encrypt_key"`
-	StringValue          types.String `tfsdk:"string_value"`
-	EncryptedStringValue types.String `tfsdk:"encrypted_string_value"`
+	EncryptKey                  types.String `tfsdk:"encrypt_key"`
+	StringValue                 types.String `tfsdk:"string_value"`
+	AdditionalAuthenticatedData types.String `tfsdk:"additional_authenticated_data"`
+	EncryptedStringValue        types.String `tfsdk:"encrypted_string_value"`
 }
 
 func (d *chacha20EncryptDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -51,9 +54,14 @@ func (d *chacha20EncryptDataSource) Schema(_ context.Context, _ datasource.Schem
 				Description: "The value to be encrypted with chacha20. This can be either a JSON string (which will be minified and trimmed before encryption) or a plain string (which will be trimmed before encryption).",
 				Required:    true,
 			},
+			"additional_authenticated_data": schema.StringAttribute{
+				Description: "Optional additional data to authenticate but not encrypt. The same value must be provided when decrypting. If the AAD is tampered with, decryption will fail.",
+				Optional:    true,
+			},
 			"encrypted_string_value": schema.StringAttribute{
-				Description: "Output of encryted string value.",
+				Description: "JSON object containing hex-encoded nonce (24B), base64-encoded ciphertext (includes auth tag), and base64-encoded additional authenticated data (AAD).",
 				Computed:    true,
+				Sensitive:   true,
 			},
 		},
 	}
@@ -70,7 +78,8 @@ func (d *chacha20EncryptDataSource) Read(ctx context.Context, req datasource.Rea
 
 	state = plan
 
-	encrypted, err := encryptChaCha20(plan.EncryptKey.ValueString(), plan.StringValue.ValueString())
+	aad := plan.AdditionalAuthenticatedData.ValueString()
+	encrypted, err := encryptChaCha20(plan.EncryptKey.ValueString(), plan.StringValue.ValueString(), aad)
 	if err != nil {
 		resp.Diagnostics.AddError("[Error] Failed to encrypt value", err.Error())
 		return
@@ -84,17 +93,28 @@ func (d *chacha20EncryptDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 }
 
+// chacha20EncryptOutput is the JSON structure returned by encryptChaCha20.
+type chacha20EncryptOutput struct {
+	Nonce      string `json:"nonce"`
+	Ciphertext string `json:"ciphertext"`
+	Tag        string `json:"tag"`
+}
+
 // encryptChaCha20 prepares the input and encrypts it with XChaCha20-Poly1305
 // AEAD. The input may be either a JSON string or a plain string: if it parses
 // as valid JSON it is minified (compacted) and trimmed; otherwise it is treated
 // as a plain string and merely trimmed. The 32-byte key is derived from the
-// provided key via SHA-256, and a deterministic 24-byte nonce is derived from
-// the resulting plaintext via SHA-256. Using a deterministic nonce keeps
-// Terraform plans stable (the same input always yields the same ciphertext).
-// The Poly1305 auth tag appended by Seal provides integrity — any tampering
-// with the ciphertext is detected on decryption (aead.Open). It returns the
-// base64-encoded ciphertext (plaintext + 16-byte auth tag).
-func encryptChaCha20(key, input string) (string, error) {
+// provided key via SHA-256. A random 24-byte nonce is generated for each
+// encryption. The optional AAD (additional authenticated data) is authenticated
+// but not encrypted -- the same AAD must be provided to decrypt. The Poly1305
+// auth tag provides integrity. It returns a JSON
+// string with three separate fields:
+//
+//	{"nonce":"<hex>","ciphertext":"<base64>","tag":"<base64>"}
+//
+// where ciphertext includes the 16-byte Poly1305 auth tag (needed for
+// decryption), and tag is the base64-encoded additional authenticated data.
+func encryptChaCha20(key, input, aad string) (string, error) {
 	// Determine the plaintext to encrypt. If the input is valid JSON, minify
 	// (compact) and trim it; otherwise treat it as a plain string and just
 	// trim it. This makes the data source compatible with both JSON and
@@ -103,7 +123,6 @@ func encryptChaCha20(key, input string) (string, error) {
 
 	var jsonValue interface{}
 	if err := json.Unmarshal([]byte(input), &jsonValue); err == nil {
-		// Input is valid JSON — re-marshal to compact/minified form.
 		minifiedBytes, err := json.Marshal(jsonValue)
 		if err != nil {
 			return "", fmt.Errorf("failed to minify JSON: %w", err)
@@ -111,25 +130,35 @@ func encryptChaCha20(key, input string) (string, error) {
 		plaintext = strings.TrimSpace(string(minifiedBytes))
 	}
 
-	// Derive the 32-byte key from the user-provided key using SHA-256 so
-	// any-length key satisfies chacha20poly1305.KeySize (32).
+	// Derive the 32-byte key from the user-provided key using SHA-256.
 	keyHash := sha256.Sum256([]byte(key))
-
-	// Derive a deterministic 24-byte nonce from the plaintext so that the same
-	// input always produces the same ciphertext. The XChaCha20 variant uses a
-	// 24-byte nonce (NonceSizeX), which is large enough that random nonces
-	// would also be safe; we keep it deterministic for Terraform plan
-	// stability. Equal plaintexts will yield equal ciphertexts, which is
-	// acceptable for this utility.
-	nonceHash := sha256.Sum256([]byte(plaintext))
 
 	aead, err := chacha20poly1305.NewX(keyHash[:])
 	if err != nil {
 		return "", fmt.Errorf("failed to create xchacha20-poly1305 aead: %w", err)
 	}
 
-	// Seal encrypts the plaintext and appends a 16-byte Poly1305 auth tag.
-	ciphertext := aead.Seal(nil, nonceHash[:chacha20poly1305.NonceSizeX], []byte(plaintext), nil)
+	// Generate a random 24-byte nonce (XChaCha20 nonce size).
+	nonce := make([]byte, chacha20poly1305.NonceSizeX)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
 
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	// Seal encrypts the plaintext and appends a 16-byte Poly1305 auth tag.
+	// AAD (if provided) is authenticated but not encrypted. The auth tag is
+	// part of the ciphertext (needed for decryption).
+	sealed := aead.Seal(nil, nonce, []byte(plaintext), []byte(aad))
+
+	output := chacha20EncryptOutput{
+		Nonce:      hex.EncodeToString(nonce),
+		Ciphertext: base64.StdEncoding.EncodeToString(sealed),
+		Tag:        base64.StdEncoding.EncodeToString([]byte(aad)),
+	}
+
+	outputJSON, err := json.Marshal(output)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal output json: %w", err)
+	}
+
+	return string(outputJSON), nil
 }
