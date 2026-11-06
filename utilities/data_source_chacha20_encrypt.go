@@ -3,11 +3,11 @@ package utilities
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -43,11 +43,11 @@ func (d *chacha20EncryptDataSource) Schema(_ context.Context, _ datasource.Schem
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"encrypt_key": schema.StringAttribute{
-				Description: "Key that used for chacha20 Encryption. Must be between 16 and 32 characters long.",
+				Description: "Hex-encoded 32-byte (256-bit) key used for XChaCha20-Poly1305 encryption. Must be exactly 64 hexadecimal characters (e.g. 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef).",
 				Required:    true,
 				Sensitive:   true,
 				Validators: []validator.String{
-					stringvalidator.LengthBetween(16, 32),
+					stringvalidator.RegexMatches(regexp.MustCompile(`^[0-9a-fA-F]{64}$`), "must be exactly 64 hexadecimal characters (32 bytes)"),
 				},
 			},
 			"string_value": schema.StringAttribute{
@@ -104,7 +104,7 @@ type chacha20EncryptOutput struct {
 // AEAD. The input may be either a JSON string or a plain string: if it parses
 // as valid JSON it is minified (compacted) and trimmed; otherwise it is treated
 // as a plain string and merely trimmed. The 32-byte key is derived from the
-// provided key via SHA-256. A random 24-byte nonce is generated for each
+// provided key (a 64-character hex string representing 32 bytes). A random 24-byte nonce is generated for each
 // encryption. The optional AAD (additional authenticated data) is authenticated
 // but not encrypted -- the same AAD must be provided to decrypt. The Poly1305
 // auth tag provides integrity. It returns a JSON
@@ -130,10 +130,13 @@ func encryptChaCha20(key, input, aad string) (string, error) {
 		plaintext = strings.TrimSpace(string(minifiedBytes))
 	}
 
-	// Derive the 32-byte key from the user-provided key using SHA-256.
-	keyHash := sha256.Sum256([]byte(key))
+	// Decode the hex-encoded 32-byte key.
+	keyBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return "", fmt.Errorf("invalid hex key: %w", err)
+	}
 
-	aead, err := chacha20poly1305.NewX(keyHash[:])
+	aead, err := chacha20poly1305.NewX(keyBytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to create xchacha20-poly1305 aead: %w", err)
 	}
