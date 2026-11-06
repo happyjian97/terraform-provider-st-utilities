@@ -29,7 +29,7 @@ func NewChacha20EncryptDataSource() datasource.DataSource {
 type chacha20EncryptDataSource struct{}
 
 type chacha20EncryptDataSourceModel struct {
-	EncryptKey                  types.String `tfsdk:"encrypt_key"`
+	SecretKey                   types.String `tfsdk:"secret_key"`
 	StringValue                 types.String `tfsdk:"string_value"`
 	AdditionalAuthenticatedData types.String `tfsdk:"additional_authenticated_data"`
 	EncryptedStringValue        types.String `tfsdk:"encrypted_string_value"`
@@ -42,7 +42,7 @@ func (d *chacha20EncryptDataSource) Metadata(_ context.Context, req datasource.M
 func (d *chacha20EncryptDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"encrypt_key": schema.StringAttribute{
+			"secret_key": schema.StringAttribute{
 				Description: "Hex-encoded 32-byte (256-bit) key used for XChaCha20-Poly1305 encryption. Must be exactly 64 hexadecimal characters (e.g. 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef).",
 				Required:    true,
 				Sensitive:   true,
@@ -79,7 +79,7 @@ func (d *chacha20EncryptDataSource) Read(ctx context.Context, req datasource.Rea
 	state = plan
 
 	aad := plan.AdditionalAuthenticatedData.ValueString()
-	encrypted, err := encryptChaCha20(plan.EncryptKey.ValueString(), plan.StringValue.ValueString(), aad)
+	encrypted, err := encryptChaCha20(plan.SecretKey.ValueString(), plan.StringValue.ValueString(), aad)
 	if err != nil {
 		resp.Diagnostics.AddError("[Error] Failed to encrypt value", err.Error())
 		return
