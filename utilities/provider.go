@@ -32,12 +32,13 @@ func (p *utilitiesProvider) Configure(ctx context.Context, req provider.Configur
 
 func (p *utilitiesProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewChacha20EncryptDataSource,
-		NewAES256GCMEncryptDataSource,
 		NewModuleTemplateDataSource,
 	}
 }
 
 func (p *utilitiesProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		NewAES256GCMEncryptResource,
+		NewChacha20EncryptResource,
+	}
 }
