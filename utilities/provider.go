@@ -37,5 +37,8 @@ func (p *utilitiesProvider) DataSources(_ context.Context) []func() datasource.D
 }
 
 func (p *utilitiesProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		NewAES256GCMEncryptResource,
+		NewChacha20EncryptResource,
+	}
 }
