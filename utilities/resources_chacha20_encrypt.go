@@ -48,7 +48,6 @@ func (d *chacha20EncryptResource) Schema(_ context.Context, _ resource.SchemaReq
 				Description: "Hex-encoded 32-byte (256-bit) key used for XChaCha20-Poly1305 encryption. Must be exactly 64 hexadecimal characters (e.g. 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef). Write-only: the value is only sent during create/update and is never stored in state or the plan file, so ephemeral values (e.g. ephemeral \"random_bytes\" with length = 32, passing its .hex output) are accepted.",
 				Required:    true,
 				Sensitive:   true,
-				WriteOnly:   true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`^[0-9a-fA-F]{64}$`), "must be exactly 64 hexadecimal characters (32 bytes)"),
 				},
