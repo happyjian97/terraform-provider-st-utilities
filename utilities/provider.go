@@ -24,7 +24,9 @@ func (p *utilitiesProvider) Metadata(ctx context.Context, req provider.MetadataR
 }
 
 func (p *utilitiesProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
-	resp.Schema = schema.Schema{}
+	resp.Schema = schema.Schema{
+		Description: "The Utilities provider is used to provides helper resources and data sources.",
+	}
 }
 
 func (p *utilitiesProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
