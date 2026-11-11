@@ -3,12 +3,12 @@
 page_title: "st-utilities_aes256_gcm_encrypt Resource - st-utilities"
 subcategory: ""
 description: |-
-  
+  This resource is to do encryption with AES-256-GCM. Required secretkey, ephemeral nonce and stringvalue to be encrypted. Version is used to trigger re-encryption when rotating the write-only nonce due to write-only is not store in state file.
 ---
 
 # st-utilities_aes256_gcm_encrypt (Resource)
 
-
+This resource is to do encryption with AES-256-GCM. Required secret_key, ephemeral nonce and string_value to be encrypted. Version is used to trigger re-encryption when rotating the write-only nonce due to write-only is not store in state file.
 
 ## Example Usage
 

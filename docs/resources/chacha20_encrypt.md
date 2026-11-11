@@ -3,12 +3,12 @@
 page_title: "st-utilities_chacha20_encrypt Resource - st-utilities"
 subcategory: ""
 description: |-
-  
+  This resource is to do encryption with XChaCha20-Poly1305. Required secretkey, ephemeral nonce and stringvalue to be encrypted. Version is used to trigger re-encryption when rotating the write-only nonce due to write-only is not store in state file.
 ---
 
 # st-utilities_chacha20_encrypt (Resource)
 
-
+This resource is to do encryption with XChaCha20-Poly1305. Required secret_key, ephemeral nonce and string_value to be encrypted. Version is used to trigger re-encryption when rotating the write-only nonce due to write-only is not store in state file.
 
 ## Example Usage
 

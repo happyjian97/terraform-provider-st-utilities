@@ -44,6 +44,7 @@ func (d *aes256GCMEncryptResource) Metadata(_ context.Context, req resource.Meta
 
 func (d *aes256GCMEncryptResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Description: "This resource is to do encryption with AES-256-GCM. Required secret_key, ephemeral nonce and string_value to be encrypted. Version is used to trigger re-encryption when rotating the write-only nonce due to write-only is not store in state file.",
 		Attributes: map[string]schema.Attribute{
 			"secret_key": schema.StringAttribute{
 				Description: "Hex-encoded 32-byte (256-bit) key used for AES-256-GCM encryption. Must be exactly 64 hexadecimal characters (e.g. 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef). Write-only: the value is only sent during create/update and is never stored in state or the plan file, so ephemeral values (e.g. ephemeral \"random_bytes\" with length = 32, passing its .hex output) are accepted.",

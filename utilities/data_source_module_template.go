@@ -34,6 +34,7 @@ func (d *moduleTemplateDataSource) Metadata(_ context.Context, req datasource.Me
 
 func (d *moduleTemplateDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Description: "This data source produce desired output base on the template and input defined.",
 		Attributes: map[string]schema.Attribute{
 			"module_info": schema.MapAttribute{
 				ElementType: types.StringType,
